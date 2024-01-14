@@ -1,0 +1,55 @@
+CREATE TRIGGER ProveraVremenaProjekta
+BEFORE INSERT ON Projekti
+FOR EACH ROW
+BEGIN
+    IF NEW.VremeZavrsetka <= NEW.VremePocetka + INTERVAL 2 DAY THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Trajanje projekta ne sme biti kraće od dva dana.';
+    END IF;
+END;
+
+DELIMITER //
+
+CREATE TRIGGER ProveraFormataOznakeProjekta
+BEFORE INSERT ON Projekti
+FOR EACH ROW
+BEGIN
+    IF NOT NEW.Oznaka REGEXP '^[A-Za-z]{3}[0-9]{9}[A-Za-z]{2}$' THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Neispravan format oznake projekta.';
+    END IF;
+END//
+
+DELIMITER ;
+
+CREATE TRIGGER ProveraVremenaAngazovanja
+BEFORE INSERT ON Angazovanje
+FOR EACH ROW
+BEGIN
+    DECLARE VremeZavrsetkaProjekta DATETIME;
+
+    SELECT VremeZavrsetka INTO VremeZavrsetkaProjekta
+    FROM Projekti
+    WHERE Projekti.ProjekatID = NEW.ProjekatID;
+
+    IF NEW.VremeAngazovanja > VremeZavrsetkaProjekta THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Zaposleni ne može biti angažovan nakon završetka projekta.';
+    END IF;
+END;
+
+CREATE TRIGGER ProveraVremenaZavrsetkaPosla
+BEFORE INSERT ON Poslovi
+FOR EACH ROW
+BEGIN
+    DECLARE VremeZavrsetkaProjekta DATETIME;
+
+    SELECT VremeZavrsetka INTO VremeZavrsetkaProjekta
+    FROM Projekti
+    WHERE Projekti.ProjekatID = NEW.ProjekatID;
+
+    IF NEW.VremeZavrsetka > VremeZavrsetkaProjekta THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Vreme završetka posla ne sme biti nakon vremena završetka projekta.';
+    END IF;
+END;
